@@ -1,0 +1,976 @@
+---
+title: "Dewlap Analysis"
+author: "Lauren E Johnson"
+date: "11/19/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(ggpubr)
+```
+
+
+#### **Background**  
+**Response Variable** = `dewlappermin`  
+**Predictor Variables** = `dewsize` and `visibility`  
+**Covariate** = `svl`  
+**Other variables** = `pushbobpermin` and `movepermin`  
+
+*Question* Do dewlap display behaviors of male anoles align with principles of signal efficacy?  
+
+#### **Data Analysis**  
+
+
+**Load Data**  
+Also create separate dataframes for each species to make analysis later a little easier 
+
+```{r}
+
+lat <- c(18.4582)
+lon <- c(-77.3985)
+id <- c('Discovery Bay Marine Laboratory')
+maps::map(database = 'world', region = 'jamaica', col= 'gray90', fill=TRUE)
+points(x = lon, y = lat, pch=19, col="red", cex=2, )
+text(lon, lat, id, pos = 4, col = 'blue', cex = 0.5)
+
+
+```
+
+
+```{r load data}
+load(here::here('data/jm_anoles.Rda'))
+
+#Creating separate dataframes for each species
+g <- jmanoles[which(jmanoles$species == "grahami"),]
+l <- jmanoles[which(jmanoles$species == "lineatopus"),]
+v <- jmanoles[which(jmanoles$species == "valencienni"),]
+
+
+
+
+
+
+
+
+
+
+# knitr::kable(head(df))
+```
+
+
+**Meeting with Don**
+
+Meeting wit Don...
+Plot original data but then report that the stats were conducted with it log transformed 
+try 3d surface plot to see how it turns out
+Mosimann size adjustment - allows pulling out of variation in trait that is masked by correlation with size (regressions can't handle collinearity)
+
+analyses shows that after you remove the effect of body size, get a very strong effect of dewlap size (even greater than dewlap size by itself and body size bby itsn't)
+large male with small dewlap 
+small male with large dewlap 
+
+exaggerates difference in dewlap size
+https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4896994/
+```{r}
+# 2 methods for extracting svl from dewlap size - (1) residuals of a linear regression of svl and dewlap size & (2) Mosimann adjustment, which is the log10(dewsize) - log10(svl)
+
+# (1) residuals 
+# creating a regression of svl and dewlap size for grahami
+g.svdew.lm <- lm(log10(dewsizemax) ~ log10(svl), data = g)
+plot(g.svdew.lm)
+# save the residuals into a vector for analysis later
+g.res.dew <- g.svdew.lm$residuals
+# add the residuals to the dataframe for grahami 
+g$res_dewsize <- g.res.dew
+
+# do the same thing for lineatopus
+l.svdew.lm <- lm(log10(dewsizemax) ~ log10(svl), data = l)
+plot(l.svdew.lm)
+l.res.dew <- l.svdew.lm$residuals
+l$res_dewsize <- l.res.dew
+
+# (2) Mosimann adjustment 
+# grahami 
+g.mos_dewsize <- log10(g$dewsizemax) - log10(g$svl)
+g$mos_dewsize <- g.mos_dewsize
+# lineatopus
+l.mos_dewsize <- log10(l$dewsizemax) - log10(l$svl)
+l$mos_dewsize <- l.mos_dewsize
+
+df <- rbind(g, l)
+
+#Add dewlap and pushbob rates per hour since they will be bigger numbers and not fractions
+df$dewlapperhour <- 60*(df$dewlappermin)
+df$pushbobperhour <- 60*(df$pushbobpermin)
+
+
+# add the log of svl and dewlap size 
+df$logsvl <- log10(df$svl)
+df$logdewsizemax <- log10(df$dewsizemax)
+df$logdewlappermin <- log10(df$dewlappermin + 1)
+df$logvisibility <- log10(df$visibility)
+
+#Remove individual without NAs for dewlap behaviors
+
+df <- df[!is.na(df$dewlapperhour),]
+
+# recreate g and l dataframes
+
+g <- df[which(df$species=='grahami'),]
+
+l <- df[which(df$species=='lineatopus'),]
+```
+
+
+12/14/2022
+```{r}
+
+#Non of the habitat variables are correlated with each other
+
+g.hab <- data.frame(height = g$height, diamter = g$diameter, visibility = g$visibility)
+
+g.hab.cor <- cor(g.hab, method = "pearson")
+
+library("Hmisc")
+res2 <- rcorr(as.matrix(g.hab))
+res2
+
+## do the same thing for the behavior data
+g.cor <- data.frame(svl = g$svl, dewarea = g$dewsizemax, height = g$height, diamter = g$diameter, visibility = g$visibility, move = g$movepermin, pushbobs = g$pushbobpermin, dewexten = g$dewlappermin)
+
+g.cor.p <- cor(g.cor, method = "pearson")
+
+library("Hmisc")
+res1 <- rcorr(as.matrix(g.cor), type = "pearson")
+res1
+
+library(corrplot)
+corrplot(g.cor.p, type = "upper", sig.level = 0.05, insig = "blank")
+
+#lineatopus 
+l.cor <- data.frame(svl = l$svl, dewarea = l$dewsizemax, height = l$height, diamter = l$diameter, visibility = l$visibility, move = l$movepermin, pushbobs = l$pushbobpermin, dewexten = l$dewlappermin)
+
+res2 <- rcorr(as.matrix(l.cor), type = "pearson")
+res2
+
+
+```
+
+
+
+
+
+
+
+
+
+
+Are the visibility of habitats different between grahami (trunk-crown) and lineatopus (trunk-ground) habitats   
+```{r}
+
+ggdensity(df, x = 'visibility', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+t.test(visibility~species, data = df)
+
+# log transforming visibility does nothing, so don't need to worry about it for analyses
+ggdensity(df, x = 'logvisibility', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+gghistogram(df, x = 'visibility', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+ggdensity(df, x = 'height', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+
+gghistogram(df, x = 'height', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+```
+
+What is the variance in dewlap size and svl across grahami and lineatopus?
+```{r}
+
+d <- ggdensity(df, x = 'dewsizemax', add = 'mean', rug = T, color = 'species', fill = 'species')
+s <- ggdensity(df, x = 'svl', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+ggarrange(d, s, heights = c(4, 4),
+          ncol = 1, nrow = 2, align = "v")
+
+d <- ggdensity(df, x = 'logdewsizemax', add = 'mean', rug = T, color = 'species', fill = 'species')
+s <- ggdensity(df, x = 'logsvl', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+ggarrange(d, s, heights = c(4, 4),
+          ncol = 1, nrow = 2, align = "v")
+
+d <- gghistogram(df, x = 'dewsizemax', add = 'mean', rug = T, color = 'species', fill = 'species')
+s <- gghistogram(df, x = 'svl', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+ggarrange(d, s, heights = c(4, 4),
+          ncol = 1, nrow = 2, align = "v")
+```
+
+```{r}
+ggplot(df, aes(svl, dewsizemax, color = species)) +
+  geom_point() + 
+  theme_classic() +
+  scale_y_log10() +
+  scale_x_log10()+
+   geom_smooth(method = lm, se = FALSE)
+
+```
+
+
+How does dewlap per hour vary across species?
+
+```{r}
+ggdensity(df, x = 'dewlapperhour', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+ggdensity(df, x = 'dewlappermin', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+ggdensity(df, x = 'logdewlappermin', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+gghistogram(df, x = 'dewlapperhour', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+gghistogram(df, x = 'pushbobperhour', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+```
+
+
+How does dewlap size vary with svl between grahami and lineatopus?
+```{r}
+ggscatter(df, x = 'svl', y = 'dewsizemax', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(df, x = 'svl', y = 'res_dewsize', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(df, x = 'logsvl', y = 'res_dewsize', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(df, x = 'svl', y = 'mos_dewsize', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(df, x = 'logsvl', y = 'logdewsizemax', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(df, x = 'dewsizemax', y = 'res_dewsize', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(df, x = 'logsvl', y = 'dewlappermin', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+```
+
+******R2 and P value for the relationship between SVL and Dewsize Max******* 
+This has all the analyses I use for the powerpoint presentation 
+```{r}
+g.lm <- lm(log(svl)~log(dewsizemax), data = g)
+
+summary(g.lm)
+# R2 = 0.88
+# p < 0.001
+
+l.lm <- lm(log(svl)~log(dewsizemax), data = l)
+
+summary(l.lm)
+# R2 = 0.68
+# p < 0.001
+
+# outputs are put on sicb graphs
+
+summary(lm(logdewlappermin~visibility, data = g))
+summary(lm(logdewlappermin~res_dewsize, data = g))
+summary(lm(logdewlappermin~logsvl, data = g))
+summary(lm(logdewlappermin~logdewsizemax, data = g))
+summary(lm(visibility~logsvl, data = g))
+summary(lm(visibility~logdewsizemax, data = g))
+
+summary(lm(logdewlappermin~visibility, data = l))
+summary(lm(logdewlappermin~res_dewsize, data = l))
+summary(lm(logdewlappermin~logsvl, data = l))
+summary(lm(logdewlappermin~logdewsizemax, data = l))
+summary(lm(visibility~logsvl, data = l))
+summary(lm(visibility~logdewsizemax, data = l))
+
+
+# residual dewsize and svl and visibility 
+g.lm.res <- lm(logdewlappermin~res_dewsize + logsvl + visibility, data = g, na.action = na.omit)
+summary(g.lm.res)
+car::Anova(g.lm.res)
+
+l.lm.res <- lm(logdewlappermin~res_dewsize + logsvl + visibility, data = l, na.action = na.omit)
+summary(l.lm.res)
+car::Anova(l.lm.res)
+
+# absolute dewsize and visibility
+g.lm.abs <- lm(logdewlappermin~logdewsizemax + visibility, data = g, na.action = na.omit)
+g.lm.abs.sum <- summary(g.lm.full)
+car::Anova(g.lm.full)
+
+l.lm.abs <- lm(logdewlappermin~logdewsizemax + visibility, data = l, na.action = na.omit)
+summary(l.lm.full)
+car::Anova(l.lm.full)
+
+library(knitr)
+t1 <- broom::tidy(car::Anova(g.lm.res))
+t2 <- broom::tidy(car::Anova(l.lm.res))
+t3 <- broom::tidy(car::Anova(g.lm.abs))
+t4 <- broom::tidy(car::Anova(l.lm.abs))
+
+library(gt)
+# Resuls of ANOVA on linear regression analysis
+t1f<- gt(t1) %>%
+    cols_label(term = 'Source', sumsq = 'SS', statistic = 'F', p.value = 'p-value') %>%
+    fmt_number(columns = c('sumsq', 'statistic', 'p.value'), decimals = 4) %>%
+    fmt_missing(columns = 2:5, missing_text = " ") %>% tab_header(title = 'A. grahami')
+
+t2f <- gt(t2) %>%
+    cols_label(term = 'Source', sumsq = 'SS', statistic = 'F', p.value = 'p-value') %>%
+    fmt_number(columns = c('sumsq', 'statistic', 'p.value'), decimals = 4) %>%
+    fmt_missing(columns = 2:5, missing_text = " ") %>% tab_header(title = 'A. lineatopus')
+
+t3f <- gt(t3) %>%
+    cols_label(term = 'Source', sumsq = 'SS', statistic = 'F', p.value = 'p-value') %>%
+    fmt_number(columns = c('sumsq', 'statistic', 'p.value'), decimals = 4) %>%
+    fmt_missing(columns = 2:5, missing_text = " ") %>% tab_header(title = 'A. grahami')
+
+t4f <- gt(t4) %>%
+    cols_label(term = 'Source', sumsq = 'SS', statistic = 'F', p.value = 'p-value') %>%
+    fmt_number(columns = c('sumsq', 'statistic', 'p.value'), decimals = 4) %>%
+    fmt_missing(columns = 2:5, missing_text = " ") %>% tab_header(title = 'A. lineatopus')
+
+gtsave(t1f, filename = 'g.lm.res.rtf', exapnd = 10)
+gtsave(t2f, filename = 'l.lm.res.rtf', exapnd = 10)
+gtsave(t3f, filename = 'g.lm.abs.rtf', exapnd = 10)
+gtsave(t4f, filename = 'l.lm.abs.rtf', exapnd = 10)
+
+```
+********** plots for sicb talk some are in repeatability_dewlap_anlaysis****************
+```{r}
+ggplot(g, aes(res_dewsize, dewlappermin)) +
+  geom_point() + 
+  theme_classic() +
+  scale_y_log10() +
+  #scale_x_log10()+
+   geom_smooth(method = lm, se = FALSE)
+
+ggplot(l, aes(res_dewsize, dewlappermin)) +
+  geom_point() + 
+  theme_classic() +
+  scale_y_log10() +
+  #scale_x_log10()+
+   geom_smooth(method = lm, se = FALSE)
+
+gghistogram(df, x = 'svl', add = 'mean', rug = T,  fill = 'species', bins = 40, binwidth = 0.5, add_density = T, xlim = c(40,70)) + 
+  facet_wrap(~species, dir = 'v') 
+
+
+ggplot(g, aes(svl, visibility)) +
+  geom_point() + 
+  theme_classic() +
+  scale_x_log10()+
+   geom_smooth(method = lm, se = FALSE)
+
+ggplot(l, aes(svl, visibility)) +
+  geom_point() + 
+  theme_classic() +
+  scale_x_log10()+
+   geom_smooth(method = lm, se = FALSE)
+```
+
+
+
+
+
+
+Are larger lizards found in more visible habitats? But SVL is a wide range, so really easy to get a correlation I bet!!
+```{r}
+ggscatter(df, x = 'logsvl', y = 'visibility', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(df, x = 'logdewsizemax', y = 'visibility', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(df, x = 'res_dewsize', y = 'visibility', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(df, x = 'mos_dewsize', y = 'visibility', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(df, x = 'logdewlappermin', y = 'visibility', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+```
+are larger individuals found at heigher perch heights?
+
+```{r}
+ggscatter(df, x = 'logsvl', y = 'height', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(df, x = 'logdewsizemax', y = 'height', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(df, x = 'res_dewsize', y = 'height', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(df, x = 'mos_dewsize', y = 'height', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(df, x = 'logdewlappermin', y = 'height', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+# just grahami
+ggscatter(g, x = 'height', y = 'dewlappermin', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species), method = 'pearson')
+ggscatter(g, x = 'height', y = 'dewsizemax', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species), method = 'pearson')
+ggscatter(g, x = 'logsvl', y = 'height', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species), method = 'pearson')
+
+ggscatter(l, x = 'logsvl', y = 'height', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species), method = 'pearson')
+ggscatter(l, x = 'dewsizemax', y = 'height', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species), method = 'pearson')
+ggscatter(l, x = 'dewlappermin', y = 'height', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species), method = 'pearson')
+
+
+# are highter perches within each species more visible?
+
+ggscatter(df, x = 'height', y = 'visibility', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+# NO
+```
+
+**Correlation Matrix**
+Creating a correlation matrix that compares the correlation among `svl`, `dewsizemax`, `visibility`, `dewlappermin`, `pushbobpermin`, and `movepermin` for all the lizard species together and each species separately.  
+
+Nubmers in the matrix represent the correlation coefficient. The color and size of the circle represnet the magnitude and direciton of the correlation. And an `x` over the correlation coefficient signifies that it is not a statistically signficant correlation. 
+```{r correlation matrix}
+# correlation matrix function 
+
+crmtrx <- function(df, speciesname){
+  
+  # subsetting the continuous variables for the matrix
+  cordata <- df[,c('svl', 'dewsizemax', 'visibility', 'dewlappermin', 'pushbobpermin', 'movepermin')]
+  
+  M <- cor(cordata, method = "pearson", use = "complete.obs")
+
+  testRes <- corrplot::cor.mtest(cordata, conf.level = 0.95)
+
+  corrplot::corrplot(M, p.mat = testRes$p, method = 'circle', type = 'lower',
+         addCoef.col ='black', number.cex = 0.8, order = 'AOE', diag=FALSE, title = speciesname)
+}
+
+
+crmtrx(jmanoles, 'All')
+crmtrx(g, 'grahami')
+crmtrx(l, 'lineatopus')
+crmtrx(v, 'valencienni')
+
+
+```
+
+For grahami, dewlappermin was strongly correlated with visibility and pushbobspermin
+For lineatopus, dewlappermin was moderately correlated with dewlap size and svl 
+
+**Regression Models**
+
+Before continuing, for valencienni, we have both males and females. All the regression analyses have males and females clumped together, but we probably can't do that because when running t tests there are differences in dewlap behavior, dewlap size, and svl between the sexes (however, there is not a difference in the visibility of the habitats they were found displaying at).
+
+```{r}
+
+t.test(data = v, dewlappermin ~ sex)
+
+t.test(data = v, dewsizemax ~ sex)
+
+t.test(data = v, svl ~ sex)
+
+
+t.test(data = v, visibility ~ sex)
+
+```
+There is a significant different between the sexes in dewlappermin, dewsize, and svl. However, there is no difference between the sexes in the visibility of the perches they chose. 
+
+
+What is the distribution of the size adjusted dewlap size values
+```{r}
+
+
+gghistogram(df, x = 'res_dewsize', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+gghistogram(df, x = 'mos_dewsize', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+
+ggdensity(df, x = 'res_dewsize', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+ggdensity(df, x = 'mos_dewsize', add = 'mean', rug = T, color = 'species', fill = 'species')
+
+
+```
+
+
+
+Now that we have the size adjusted values, lets run the regression models to test whether visibility or dewlap size predicts dewlap dispaly behavior 
+```{r}
+
+ggscatter(g, x = 'mos_dewsize', y = 'dewlappermin', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(g, x = 'res_dewsize', y = 'dewlappermin', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(l, x = 'mos_dewsize', y = 'dewlappermin', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+ggscatter(l, x = 'res_dewsize', y = 'dewlappermin', color = 'species', add = 'reg.line', conf.int = T, conf.int.level = .95) + stat_cor(aes(color = species),method = 'pearson')
+
+# Linear Regression 
+dew.lm <- lm(log(dewlappermin+1) ~ visibility + res_dewsize, data = g)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm)
+
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility + mos_dewsize, data = g)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm)
+
+# is there interactions
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility * res_dewsize, data = g)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm)
+
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility * mos_dewsize, data = g)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm)
+
+##
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility + res_dewsize, data = l)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm)
+
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility + mos_dewsize, data = l)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm)
+
+# is there interacitons
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility * res_dewsize, data = l)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm)
+
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility * mos_dewsize, data = l)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm)
+
+
+dew.lm <- lm(log(dewlappermin+1) ~ mos_dewsize + svl, data = l)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm)
+
+dew.lm <- lm(log(dewlappermin+1) ~ dewsizemax + visibility, data = g)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm)
+# # Residuals 
+# dewlap.lm <- lm(log(dewlappermin+1) ~ visibility + res_dew, data = subset(jmanoles, species == 'grahami'))
+# 
+# plot(dewlap.lm)
+# summary(dewlap.lm)
+# car::Anova(dewlap.lm)
+# 
+# # Mosimann size adjustment
+# 
+# log_dewsize <- log10(g$dewsizemax) - log10(g$svl) # relative dewlap size is signicant dewlap size adjusted for SVL
+# 
+# dewlap.lm <- lm(log(dewlappermin+1) ~ visibility + log_dewsize , data = subset(jmanoles, species == 'grahami'))
+# 
+# plot(dewlap.lm)
+# 
+# summary(dewlap.lm)
+# # want the min and max residuals symmetric (what the QQplot is showing)
+# # estimat/std error = t value
+# 
+# car::Anova(dewlap.lm) # type II automaticall hols the other value constant will calculating second 
+# 
+# anova(dewlap.lm) # type 1 heirarchical variation explained 
+
+# when model is significant summary(model) pvalue and f statistic but the individual values aren't 
+
+```
+Trying a scatter plot grouped by visibility color
+
+
+More cleaned versions of the anlayses I want to run
+```{r}
+
+# absolute dewlap size
+
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility * dewsizemax, data = g)
+plot(dew.lm)
+summary(dew.lm) # model itself is signficant, but not individual variables
+car::Anova(dew.lm) # visibility is significant, dewsizemax trending
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility * dewsizemax, data = l)
+plot(dew.lm)
+summary(dew.lm) 
+car::Anova(dew.lm) 
+
+ 
+# no interaction, so took it out of model 
+dew.lm <- lm(log(dewlappermin+1) ~ visibility + res_dewsize + logsvl, data = g)
+plot(dew.lm)
+summary(dew.lm) # model itself is signficant, but not individual variables
+car::Anova(dew.lm) # visibility is significant, dewsizemax trending
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility + res_dewsize + logsvl, data = l)
+plot(dew.lm)
+summary(dew.lm) 
+car::Anova(dew.lm) 
+
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility, data = g)
+plot(dew.lm)
+summary(dew.lm) 
+car::Anova(dew.lm) 
+
+####
+dew.lm <- lm(log(dewlappermin+1) ~ visibility * dewsizemax, data = g)
+plot(dew.lm)
+summary(dew.lm) 
+car::Anova(dew.lm) 
+
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility * res_dewsize, data = g)
+plot(dew.lm)
+summary(dew.lm) 
+car::Anova(dew.lm) 
+
+
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility * dewsizemax, data = l)
+plot(dew.lm)
+summary(dew.lm) 
+car::Anova(dew.lm) 
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility + dewsizemax, data = l)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm)
+
+dew.lm <- lm(log(dewlappermin+1) ~ visibility + res_dewsize, data = l)
+plot(dew.lm)
+summary(dew.lm) 
+car::Anova(dew.lm) 
+
+```
+
+
+
+```{r}
+
+library(ggplot2)
+
+# showing visibility with color and size, and dewsize on the x axis
+ggplot(g, aes(mos_dewsize, dewlappermin, color = visibility)) +
+  scale_color_gradient(low = "yellow", high = "red") +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = visibility), alpha = 0.75) + scale_radius(range = c(2, 12)) +
+  theme_classic() + 
+  geom_smooth(method = 'lm', se = FALSE, color = 'black')
+
+ggplot(g, aes(res_dewsize, dewlappermin, color = visibility)) +
+  scale_color_gradient(low = "yellow", high = "red") +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = visibility), alpha = 0.75) + scale_radius(range = c(2, 12)) +
+  theme_classic() + 
+  geom_smooth(method = 'lm', se = FALSE, color = 'black')
+
+ggplot(g, aes(dewsizemax, dewlappermin, color = visibility)) +
+  scale_color_gradient(low = "yellow", high = "red") +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = visibility), alpha = 0.75) + scale_radius(range = c(2, 12)) +
+  theme_classic() + 
+  geom_smooth(method = 'lm', se = FALSE, color = 'black')
+
+
+ggplot(g, aes(svl, dewlappermin, color = visibility)) +
+  scale_color_gradient(low = "yellow", high = "red") +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = visibility), alpha = 0.75) + scale_radius(range = c(2, 12)) +
+  theme_classic() + 
+  geom_smooth(method = lm, se = FALSE)
+##
+
+ggplot(g, aes(mos_dewsize, log(dewlappermin+1), color = visibility)) +
+  scale_color_gradient(low = "yellow", high = "red") +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = visibility), alpha = 0.75) + scale_radius(range = c(2, 12)) +
+  theme_classic() + 
+  geom_smooth(method = 'lm', se = FALSE, color = 'black')
+
+# showing dewsize with color and size, and visibility on the x axis
+ggplot(g, aes(visibility, dewlappermin, color = dewsizemax)) +
+  scale_color_gradient(low = "yellow", high = "red") +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = dewsizemax), alpha = 0.75) + scale_radius(range = c(2, 12)) +
+  theme_classic() +
+   geom_smooth(method = 'lm', se = FALSE, color = 'black') + ylim(0, 3.2)
+
+ggplot(g, aes(visibility, dewlappermin, color = res_dewsize)) +
+  scale_color_gradient(low = "yellow", high = "red") +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = res_dewsize), alpha = 0.75) + scale_radius(range = c(2, 12)) +
+  theme_classic() +
+   geom_smooth(method = 'lm', se = FALSE, color = 'black') + ylim(0, 3.2)
+
+ggplot(g, aes(visibility, log(dewlappermin+1), color = mos_dewsize)) +
+  scale_color_gradient(low = "yellow", high = "red") +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = mos_dewsize), alpha = 0.75) + scale_radius(range = c(2, 12)) +
+  theme_classic() +
+   geom_smooth(method = 'lm', se = FALSE, color = 'black')
+
+ggplot(g, aes(visibility, dewlappermin, color = mos_dewsize)) +
+  scale_color_gradient(low = "yellow", high = "red") +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = mos_dewsize), alpha = 0.75) + scale_radius(range = c(2, 12)) +
+  theme_classic() +
+   geom_smooth(method = 'lm', se = FALSE, color = 'black') + ylim(0, 3.2)
+# geom_smooth method  = 'lm'
+  
+```
+
+Plot graphs showig the effect of mos_dew size on dewlapppermin for lineatopus
+
+```{r}
+# keeping with theme for lin 
+ggplot(l, aes(mos_dewsize, log(dewlappermin+1), color = mos_dewsize)) +
+  scale_color_gradient(low = "yellow", high = "red") +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = mos_dewsize), alpha = 0.75) + scale_radius(range = c(2, 12)) +
+  theme_classic() +
+   geom_smooth(method = 'lm', se = FALSE, color = 'black')
+
+
+# geom_smooth method  = 'lm'
+
+ggplot(l, aes(dewsizemax, dewlappermin, color = visibility)) +
+  scale_color_gradient(low = "yellow", high = "red") +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = visibility), alpha = 0.75) + scale_radius(range = c(2, 12)) +
+  theme_classic() +
+   geom_smooth(method = 'lm', se = FALSE, color = 'black')
+
+ggplot(l, aes(res_dewsize, dewlappermin, color = visibility)) +
+  scale_color_gradient(low = "yellow", high = "red") +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = visibility), alpha = 0.75) + scale_radius(range = c(2, 12)) +
+  theme_classic() +
+   geom_smooth(method = 'lm', se = FALSE, color = 'black')
+
+# no keeping with theme for grahami
+ggplot(l, aes(dewsizemax, dewlappermin)) +
+  geom_point()+
+  #geom_point(aes(colour = visibility)) + 
+  theme_classic() +
+   geom_smooth(method = 'lm', se = FALSE, color = 'black')
+# geom_smooth method  = 'lm'
+
+```
+
+Final SICB graphs
+
+```{r}
+# grahami
+ggplot(g, aes(visibility, dewlappermin)) +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = dewsizemax), alpha = 0.5) + scale_radius(range = c(2, 12)) +
+  theme_classic() +
+   geom_smooth(method = 'lm', se = FALSE, color = 'black') + ylim(0, 3.2)
+
+ggplot(g, aes(visibility, dewlappermin)) +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = res_dewsize), alpha = 0.5) + scale_radius(range = c(2, 12)) +
+  theme_classic() +
+   geom_smooth(method = 'lm', se = FALSE, color = 'black') + ylim(0, 3.2)
+
+
+
+# lineatopus
+ggplot(l, aes(visibility, dewlappermin)) +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = dewsizemax), alpha = 0.5) + scale_radius(range = c(2, 12)) +
+  theme_classic() +
+   geom_smooth(method = 'lm', se = FALSE, color = 'black', linetype = 2) 
+
+ggplot(l, aes(visibility, dewlappermin)) +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = res_dewsize), alpha = 0.5) + scale_radius(range = c(2, 12)) +
+  theme_classic() +
+   geom_smooth(method = 'lm', se = FALSE, color = 'black', linetype = 2) 
+
+ggplot(l, aes(dewsizemax, dewlappermin)) +
+  #geom_point(aes(colour = visibility)) + 
+  geom_point(aes(size = dewsizemax), alpha = 0.5) + scale_radius(range = c(2, 12)) +
+  theme_classic() +
+   geom_smooth(method = 'lm', se = FALSE, color = 'black') 
+
+```
+
+
+
+
+
+
+###########################3
+Function to run regression models
+```{r regression models grahami}
+library(tidyverse)
+library(knitr)
+library(broom)
+
+# creating a funciton to run the regression analyses 
+lmfxn <- function(response, predictors, speciesname){
+  
+   fixedformula <- paste(response, "~", predictors)
+   
+   lm(as.formula(fixedformula), data = subset(jmanoles, species == speciesname)) %>%
+     tidy() %>%
+     kable()
+
+}
+
+
+```
+**Full Model (absolute dewlap size)**   
+`dewsizemax` + `visibility`
+```{r full model absolute}
+
+lmfxn('dewlappermin', 'dewsizemax + visibility', 'grahami')
+
+lmfxn('dewlappermin', 'dewsizemax + visibility', 'lineatopus')
+
+lmfxn('dewlappermin', 'dewsizemax + visibility', 'valencienni')
+
+```
+
+**Full Model with Intereaction**
+```{r full model absolute interaction}
+
+lmfxn('dewlappermin', 'dewsizemax * visibility', 'grahami')
+
+lmfxn('dewlappermin', 'dewsizemax * visibility', 'lineatopus')
+
+
+```
+
+**Full Model (relative dewlap size)**   
+`svl` + `dewsizemax` + `visibility`
+```{r full model relative}
+
+lmfxn('dewlappermin', 'svl + dewsizemax + visibility', 'grahami')
+
+lmfxn('dewlappermin', 'svl + dewsizemax + visibility', 'lineatopus')
+
+lmfxn('dewlappermin', 'svl + dewsizemax + visibility', 'valencienni')
+
+```
+
+
+**Signal Size Model**  
+Do males with larger dewlaps (absolute size) display their dewlaps more than lizards with smaller dewlaps?  
+`dewsizemax`  
+  
+Do males with relatively larger dewlaps display their dewlaps more than lizards with smaller dewlaps?
+`dewsizemax` + `svl`
+```{r signal size model}
+
+lmfxn('dewlappermin', 'dewsizemax', 'grahami')
+lmfxn('dewlappermin', 'dewsizemax + svl', 'grahami')
+lmfxn('dewlappermin', 'svl', 'grahami')
+
+
+lmfxn('dewlappermin', 'dewsizemax', 'lineatopus')
+lmfxn('dewlappermin', 'dewsizemax + svl', 'lineatopus')
+lmfxn('dewlappermin', 'svl', 'lineatopus')
+
+
+lmfxn('dewlappermin', 'dewsizemax', 'valencienni')
+lmfxn('dewlappermin', 'dewsizemax + svl', 'valencienni')
+lmfxn('dewlappermin', 'svl', 'valencienni')
+
+```
+```{r}
+# library(ppcor)
+# 
+# cor <- data.frame(g$dewlappermin, g$dewsizemax, g$svl)
+# spcor.test(g$dewlappermin, g$dewsizemax, g$svl, method = c('pearson'))
+
+```
+
+
+```{r fig svl dewsizemax}
+library(ggplot2)
+
+ggplt <- ggplot(jmanoles,aes(x = svl, y = dewsizemax, shape = sex, color = species))+
+         geom_point()+
+         theme_classic() 
+
+ggplt+geom_smooth(method=lm,se=FALSE,fullrange=TRUE,
+                  aes(color=species))
+
+```
+
+```{r fig svl dewlappermin}
+library(ggplot2)
+
+ggplt <- ggplot(jmanoles,aes(x = svl, y = dewlappermin, shape = species, color = species))+
+         geom_point()+
+         theme_classic() + ylim(0,3.2)
+
+ggplt+geom_smooth(method=lm,se=FALSE,fullrange=TRUE,
+                  aes(color=species))
+
+```
+
+```{r fig dewsizemax dewlappermin}
+library(ggplot2)
+
+ggplt <- ggplot(jmanoles,aes(x = dewsizemax, y = dewlappermin, shape = species, color = species))+
+         geom_point()+
+         theme_classic() + ylim(0,3.2)
+
+ggplt+geom_smooth(method=lm,se=FALSE,fullrange=TRUE,
+                  aes(color=species))
+
+```
+
+```{r fig dewsizemax/svl dewlappermin}
+library(ggplot2)
+
+ggplt <- ggplot(jmanoles,aes(x = dewsizemax/svl, y = dewlappermin, shape = species, color = species))+
+         geom_point()+
+         theme_classic() + ylim(0,3.2)
+
+ggplt+geom_smooth(method=lm,se=FALSE,fullrange=TRUE,
+                  aes(color=species))
+
+```
+
+
+**Visibility Model**   
+Do males with in more visible habitats display their dewlap more than lizards in more cluttered habitats?  
+`visibility`  
+  
+```{r visibility model}
+
+lmfxn('dewlappermin', 'visibility', 'grahami')
+
+lmfxn('dewlappermin', 'visibility', 'lineatopus')
+
+lmfxn('dewlappermin', 'visibility', 'valencienni')
+
+```
+
+```{r fig visibility dewlapppermin}
+library(ggplot2)
+
+#ggplot(data = jmanoles, aes(x = visibility, y = dewlappermin, color = species)) + geom_point()
+
+ggplt <- ggplot(jmanoles,aes(x = visibility, y = dewlappermin, shape = species, color = species))+
+         geom_point()+
+         theme_classic() + ylim(0,3.2) + xlim(0.59,1)
+
+ggplt+geom_smooth(method=lm,se=FALSE,fullrange=TRUE,
+                  aes(color=species))
+
+```
+
+Note: this relationship, especially for grahami seems more curvilinear than linear

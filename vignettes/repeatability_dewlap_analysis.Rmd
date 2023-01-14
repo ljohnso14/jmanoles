@@ -1,0 +1,418 @@
+---
+title: "Repeatability Dewlap Behavior Analysis"
+author: "Lauren E Johnson"
+date: "12/23/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Import data from prior analyses
+```{r}
+load(here::here('data/jm_anoles.Rda'))
+
+#Creating separate dataframes for each species
+g <- jmanoles[which(jmanoles$species == "grahami"),]
+l <- jmanoles[which(jmanoles$species == "lineatopus"),]
+v <- jmanoles[which(jmanoles$species == "valencienni"),]
+```
+
+Import raw unorganized data wrangle behavior data
+```{r}
+# Read data file
+gra_beh <- read.csv(here::here('data_raw/GRA_beh.csv'))
+lin_beh <- read.csv(here::here('data_raw/LIN_beh.csv'))
+
+# Create column with dewlap rate per minute, since not all observations were exactly 20 minutes 
+gra_beh$dewlappermin <- ((gra_beh$Dewlap)/(gra_beh$Total.time))
+lin_beh$dewlappermin <- ((lin_beh$Dewlap)/(lin_beh$Totaltime))
+
+
+# Numbering rows for each data frame individual
+library(dplyr)
+gra_beh <- gra_beh %>% group_by(ID) %>% mutate(observation = row_number())
+lin_beh <- lin_beh %>% group_by(ID) %>% mutate(observation = row_number())
+
+
+# Creating a single wide row for each individual
+library(tidyr)
+gra_beh_wide <- pivot_wider(data = gra_beh, names_from = observation, 
+                            names_glue = "{observation}_{.value}", 
+                            values_from = c(Date, Person, Start.time, Total.time,
+                                            Dewlap, Pushbobs, Movements))
+
+lin_beh_wide <- pivot_wider(data = lin_beh, names_from = observation,
+                              names_glue = "{observation}_{.value}",
+                              values_from = c(Date, Person, Starttime, Totaltime,
+                                              Dewlap, Pushbobs, Movements))
+```
+
+Import raw unorganized data and data wrangle habitat data
+```{r}
+# Read data file
+gra_hab <- read.csv(here::here('data_raw/GRA_hab.csv'))
+lin_hab <- read.csv(here::here('data_raw/LIN_hab.csv'))
+
+# Remove rows that do not contain visibility data
+gra_hab <- gra_hab[!is.na(gra_hab$Vis),]
+lin_hab <- lin_hab[!is.na(lin_hab$Vis),]
+
+
+# Numbering rows for each data frame individual
+library(dplyr)
+gra_hab <- gra_hab %>% group_by(ID) %>% mutate(observation = row_number())
+lin_hab <- lin_hab %>% group_by(ID) %>% mutate(observation = row_number())
+
+# Creating a single wide row for each individual
+library(tidyr)
+gra_hab_wide <- pivot_wider(data = gra_hab,
+                              names_from = observation,
+                              names_glue = "{observation}_{.value}",
+                              values_from = c(height, diameter, Vis))
+lin_hab_wide <- pivot_wider(data = lin_hab,
+                              names_from = observation,
+                              names_glue = "{observation}_{.value}",
+                              values_from = c(height, diameter, Vis))
+
+```
+
+Create dataframe for grahami with averages and standard deviations for behavior and habitat variables
+```{r}
+library(tidyverse)
+# grahami 
+
+# Overall total dewlaps per total time 
+dew_rate_df <- gra_beh %>%
+  group_by(ID) %>%
+  summarise(dew_rate = (sum(Dewlap)/sum(Total.time)))
+
+# Average dewlap rate across all observations 
+dew_rate_mean_df <- gra_beh %>%
+  group_by(ID) %>%
+  summarise(dew_rate_mean = mean(dewlappermin))
+
+# Standard deviation of average dewlap rate across all observations
+dew_rate_sd_df <- gra_beh %>%
+  group_by(ID) %>%
+  summarise(dew_rate_sd = sd(dewlappermin))
+
+# Average visibility of perch across all observations
+vis_mean_df <- gra_hab %>% 
+  group_by(ID) %>%
+  summarise(vis_mean = mean(Vis, na.rm = T))
+
+# Standard deviation of perch visibility across all observations
+vis_sd_df <- gra_hab %>% 
+  group_by(ID) %>%
+  summarise(vis_sd = sd(Vis, na.rm = T))
+
+# Number of behavioral observations for each individual 
+dew_rate_observations_df <- gra_beh %>%
+  count(ID, name = 'dewlappermin_observations')
+
+# Number of habitat observations for each individual 
+vis_observations_df <- gra_hab %>% 
+  count(ID, name = 'vis_observations')
+
+
+# Create a list of all the summary information dataframes 
+df_list <- list(dew_rate_df, dew_rate_mean_df, dew_rate_sd_df, vis_mean_df, vis_sd_df, dew_rate_observations_df, vis_observations_df, g)
+
+# Join all the dataframe into a composite dataframe from wich we can run analyses etc. 
+gra_df <- Reduce(function(d1, d2) merge(d1, d2, by = 'ID', all.x = T), df_list)
+
+
+```
+
+Create dataframe for lineatopus with averages and standard deviations for behavior and habitat variables
+```{r}
+library(tidyverse)
+# grahami 
+
+# Overall total dewlaps per total time 
+dew_rate_df <- lin_beh %>%
+  group_by(ID) %>%
+  summarise(dew_rate = (sum(Dewlap)/sum(Totaltime)))
+
+# Average dewlap rate across all observations 
+dew_rate_mean_df <- lin_beh %>%
+  group_by(ID) %>%
+  summarise(dew_rate_mean = mean(dewlappermin))
+
+# Standard deviation of average dewlap rate across all observations
+dew_rate_sd_df <- lin_beh %>%
+  group_by(ID) %>%
+  summarise(dew_rate_sd = sd(dewlappermin))
+
+# Average visibility of perch across all observations
+vis_mean_df <- lin_hab %>% 
+  group_by(ID) %>%
+  summarise(vis_mean = mean(Vis, na.rm = T))
+
+# Standard deviation of perch visibility across all observations
+vis_sd_df <- lin_hab %>% 
+  group_by(ID) %>%
+  summarise(vis_sd = sd(Vis, na.rm = T))
+
+# Number of behavioral observations for each individual 
+dew_rate_observations_df <- lin_beh %>%
+  count(ID, name = 'dewlappermin_observations')
+
+# Number of habitat observations for each individual 
+vis_observations_df <- lin_hab %>% 
+  count(ID, name = 'vis_observations')
+
+
+# Create a list of all the summary information dataframes 
+df_list <- list(dew_rate_df, dew_rate_mean_df, dew_rate_sd_df, vis_mean_df, vis_sd_df, dew_rate_observations_df, vis_observations_df, l)
+
+# Join all the dataframe into a composite dataframe from wich we can run analyses etc. 
+lin_df <- Reduce(function(d1, d2) merge(d1, d2, by = 'ID', all.x = T), df_list)
+
+
+```
+
+mean and standard deviation for number of observations for behavior and habitat selection 
+```{r}
+summary(lin_df$dewlappermin_observations)
+mean(lin_df$dewlappermin_observations)
+sd(lin_df$dewlappermin_observations)
+
+
+summary(gra_df$dewlappermin_observations)
+mean(gra_df$dewlappermin_observations)
+sd(gra_df$dewlappermin_observations)
+
+
+summary(lin_df$vis_observations)
+mean(lin_df$vis_observations, na.rm = T)
+sd(lin_df$vis_observations, na.rm = T)
+
+
+summary(gra_df$vis_observations)
+mean(gra_df$vis_observations, na.rm = T)
+sd(gra_df$vis_observations, na.rm = T)
+```
+
+
+Grahami Plots
+```{r}
+
+# This graph is the keeper because it scales it to log10 but keeps the axis with the true lables not the weird lables that don't mean anything intuitively 
+ggplot(gra_df, aes(vis_mean, dew_rate)) +
+  geom_point() + 
+  theme_classic() +
+  scale_y_log10() +
+   geom_smooth(method = lm, se = FALSE)
+
+ggplot(gra_df, aes(svl, dew_rate)) +
+  geom_point() + 
+  theme_classic() +
+  scale_y_log10() +
+  scale_x_log10()+
+   geom_smooth(method = lm, se = FALSE)
+
+ggplot(gra_df, aes(dewsizemax, dew_rate)) +
+  geom_point() + 
+  theme_classic() +
+  scale_y_log10() +
+  scale_x_log10()+
+   geom_smooth(method = lm, se = FALSE)
+
+# residual dewlap plot is in the dewlap_analysis folder
+
+
+
+```
+
+Lineatopus Plots
+```{r}
+
+# This graph is the keeper because it scales it to log10 but keeps the axis with the true lables not the weird lables that don't mean anything intuitively 
+ggplot(lin_df, aes(vis_mean, dew_rate)) +
+  geom_point() + 
+  theme_classic() +
+  scale_y_log10() +
+   geom_smooth(method = lm, se = FALSE)
+
+ggplot(lin_df, aes(svl, dew_rate)) +
+  geom_point() + 
+  theme_classic() +
+  scale_y_log10() +
+  scale_x_log10()+
+   geom_smooth(method = lm, se = FALSE)
+
+ggplot(lin_df, aes(dewsizemax, dew_rate)) +
+  geom_point() + 
+  theme_classic() +
+  scale_y_log10() +
+  scale_x_log10()+
+   geom_smooth(method = lm, se = FALSE)
+
+```
+
+Analyses
+Grahami - visibility and dewsize max are associated with dewlap display
+Lineatopus - only dewsize max is associated with dewlap display 
+for neither species is SVL associated with dewlap display (there are some differences in svl and dewlap size)
+```{r}
+dew.lm <- lm(log(dew_rate + 1) ~ visibility * dewsizemax, data = gra_df)
+plot(dew.lm)
+summary(dew.lm) 
+car::Anova(dew.lm)
+
+dew.lm <- lm(log(dew_rate + 1) ~ visibility + dewsizemax, data = gra_df)
+plot(dew.lm)
+summary(dew.lm) 
+car::Anova(dew.lm)
+
+dew.lm <- lm(log(dew_rate + 1) ~ visibility * svl, data = gra_df)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm) 
+
+dew.lm <- lm(log(dew_rate + 1) ~ visibility + svl, data = gra_df)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm) 
+
+
+dew.lm <- lm(log(dew_rate + 1) ~ visibility * dewsizemax, data = lin_df)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm) 
+
+dew.lm <- lm(log(dew_rate + 1) ~ visibility + dewsizemax, data = lin_df)
+plot(dew.lm)
+summary(dew.lm)
+car::Anova(dew.lm) 
+
+dew.lm <- lm(log(dew_rate + 1) ~ visibility * svl, data = lin_df)
+plot(dew.lm)
+summary(dew.lm) 
+car::Anova(dew.lm) 
+
+dew.lm <- lm(log(dew_rate + 1) ~ visibility + svl, data = lin_df)
+plot(dew.lm)
+summary(dew.lm) 
+car::Anova(dew.lm) 
+```
+
+Create lineplot showing intra-individual variation in dewlap display and habitat characteristics
+```{r}
+lin_hab_2<-lin_hab[!(lin_hab$ID=='L109' | lin_hab$ID=='L124' | lin_hab$ID=='L150' | lin_hab$ID=='L160' | lin_hab$ID== 'L166' | lin_hab$ID== 'L167' | lin_hab$ID== 'L169' | lin_hab$ID== 'L176' | lin_hab$ID== 'L305' | lin_hab$ID== 'L321' | lin_hab$ID== 'L323' | lin_hab$ID== 'L324' | lin_hab$ID== 'L331' | lin_hab$ID== 'L334'),]
+
+gra_hab_2 <- gra_hab[!(gra_hab$ID=='G107' | gra_hab$ID=='G120' | gra_hab$ID=='G123' | gra_hab$ID=='G127' | gra_hab$ID=='G128' | gra_hab$ID=='G137' | gra_hab$ID=='G142' | gra_hab$ID=='G150' | gra_hab$ID=='G159' | gra_hab$ID=='G305' | gra_hab$ID=='G334' | gra_hab$ID=='G338'),]
+
+
+library(ggplot2)
+
+
+library(tidyverse)
+dMean <- gra_beh %>%
+    group_by(ID) %>%
+    summarise(MN = mean(dewlappermin))
+
+
+
+# Repeatability of dewlappermin for grahami 
+grahbehMean <- gra_beh %>%
+    group_by(ID) %>%
+    summarise(MN = mean(dewlappermin))
+
+ggplot(data = gra_beh, aes(x = observation, y = dewlappermin, group = ID)) +
+  geom_hline(data = grahbehMean, aes(yintercept = MN)) +
+  geom_line(aes(color = ID)) +
+  geom_point(aes(color = ID)) +
+  facet_wrap(. ~ ID, ncol = 10) +
+  theme(legend.position = 'none')
+
+# Repeatability of dewlappermin for lineatopus 
+linbehMean <- lin_beh %>%
+    group_by(ID) %>%
+    summarise(MN = mean(dewlappermin))
+
+ggplot(data = lin_beh, aes(x = observation, y = dewlappermin, group = ID)) +
+  geom_hline(data = linbehMean, aes(yintercept = MN)) +
+  geom_line(aes(color = ID)) +
+  geom_point(aes(color = ID)) +
+  facet_wrap(. ~ ID, ncol = 10) +
+  theme(legend.position = 'none')
+
+# Repeatability of perch visibility for grahami 
+
+grahVisMean <- gra_hab_2 %>%
+    group_by(ID) %>%
+    summarise(MN = mean(Vis))
+
+ggplot(data = gra_hab_2, aes(x = observation, y = Vis, group = ID)) +
+  geom_hline(data = grahVisMean, aes(yintercept = MN)) +
+  geom_path(aes(color = ID)) +
+  geom_point(aes(color = ID)) +
+  facet_wrap(. ~ ID, ncol = 10) +
+  theme(legend.position = 'none')
+
+
+# Repeatability of perch visibility for lineatopus 
+
+linVisMean <- lin_hab_2 %>%
+    group_by(ID) %>%
+    summarise(MN = mean(Vis))
+
+ggplot(data = lin_hab_2, aes(x = observation, y = Vis, group = ID)) +
+  geom_hline(data = linVisMean, aes(yintercept = MN)) +
+  geom_line(aes(color = ID)) +
+  geom_point(aes(color = ID)) +
+  facet_wrap(. ~ ID, ncol = 10) +
+  theme(legend.position = 'none')
+
+# Perch height
+grahheightMean <- gra_hab_2 %>%
+    group_by(ID) %>%
+    summarise(MN = mean(height))
+
+ggplot(data = gra_hab_2, aes(x = observation, y = height, group = ID)) +
+  geom_hline(data = grahheightMean, aes(yintercept = MN)) +
+  geom_line(aes(color = ID)) +
+  geom_point(aes(color = ID)) +
+  facet_wrap(. ~ ID, ncol = 10) +
+  theme(legend.position = 'none')
+
+
+linheightMean <- lin_hab_2 %>%
+    group_by(ID) %>%
+    summarise(MN = mean(height))
+
+ggplot(data = lin_hab_2, aes(x = observation, y = height, group = ID)) +
+  geom_hline(data = linheightMean, aes(yintercept = MN)) +
+  geom_line(aes(color = ID)) +
+  geom_point(aes(color = ID)) +
+  facet_wrap(. ~ ID, ncol = 10) +
+  theme(legend.position = 'none')
+
+# # Perch diameter - issue in that some are just written as rock of wall...
+# ggplot(data = gra_hab, aes(x = observation, y = diameter, group = ID)) +
+#   geom_path(aes(color = ID)) +
+#   geom_point(aes(color = ID)) +
+#   facet_wrap(. ~ ID, ncol = 10) +
+#   theme(legend.position = 'none')
+# 
+# ggplot(data = lin_hab, aes(x = observation, y = diameter, group = ID)) +
+#   geom_line(aes(color = ID)) +
+#   geom_point(aes(color = ID)) +
+#   facet_wrap(. ~ ID, ncol = 10) +
+#   theme(legend.position = 'none')
+```
+
+
+Rpeateability analyeses
+```{r}
+
+library(rptR)
+
+rpt(Vis ~ (1 | ID), grname = "Visibility", data = lin_hab, link = 'logit', datatype = "Proportion", 
+    nboot = 0, npermut = 0)
+
+```
+

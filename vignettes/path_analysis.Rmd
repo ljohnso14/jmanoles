@@ -1,0 +1,238 @@
+---
+title: "path analysis"
+author: "Lauren E Johnson"
+date: "2023-01-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#for path model
+# view more info about this at https://rpubs.com/tbihansk/302732
+library(lavaan)
+library(semPlot)
+library(OpenMx)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(GGally)
+```
+
+```{r}
+#full  model for path analysis
+model <-'
+dewlappermin ~ visibility + diameter + height +  svl
+
+'
+```
+
+```{r}
+#fit the model
+fit <-cfa(model, data = g)
+```
+
+```{r}
+#view the results
+summary(fit, fit.measures = TRUE, standardized=T,rsquare=T)
+```
+
+```{r}
+#build a structural equation model (SEM)
+semPaths(fit, 'std', layout = 'tree', nCharNodes=0)
+
+```
+
+
+
+
+
+
+
+
+```{r}
+#full  model for path analysis
+model <-'
+dewlappermin ~ visibility + diameter + height + svl
+
+'
+```
+
+```{r}
+#fit the model
+fit <-cfa(model, data = l)
+```
+
+```{r}
+#view the results
+summary(fit, fit.measures = TRUE, standardized=T,rsquare=T)
+```
+
+```{r}
+#build a structural equation model (SEM)
+semPaths(fit, 'std', layout = 'tree', nCharNodes=0)
+
+```
+
+
+
+
+
+Random Forest Approach 
+Source: https://hackernoon.com/random-forest-regression-in-r-code-and-interpretation
+
+```{r}
+library(randomForest)
+library(ggplot2)
+```
+
+```{r}
+rf.fit <- randomForest(dewlappermin ~ visibility + diameter + height + svl, 
+                       data= g, ntree=10000, keep.forest=FALSE, importance=TRUE, 
+                       type = 'regression')
+
+rf.fit
+```
+
+```{r}
+### Visualize variable importance ----------------------------------------------
+
+# Get variable importance from the model fit
+ImpData <- as.data.frame(importance(rf.fit))
+ImpData$Var.Names <- row.names(ImpData)
+
+ggplot(ImpData, aes(x=Var.Names, y=`%IncMSE`)) + geom_segment( aes(x=Var.Names, xend=Var.Names, y=0, yend=`%IncMSE`), color="skyblue") +
+  geom_point(aes(size = IncNodePurity), color="blue", alpha=0.6) +
+  theme_light() +
+  coord_flip() +
+  theme(
+    legend.position="bottom",
+    panel.grid.major.y = element_blank(),
+    panel.border = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+```
+
+
+
+
+
+
+
+
+
+```{r}
+rf.fit <- randomForest(dewlappermin ~ visibility + diameter + height + svl, 
+                       data= l, ntree=10000, keep.forest=FALSE, importance=TRUE, 
+                       type = 'regression')
+
+rf.fit
+```
+
+```{r}
+### Visualize variable importance ----------------------------------------------
+
+# Get variable importance from the model fit
+ImpData <- as.data.frame(importance(rf.fit))
+ImpData$Var.Names <- row.names(ImpData)
+
+ggplot(ImpData, aes(x=Var.Names, y=`%IncMSE`)) + geom_segment( aes(x=Var.Names, xend=Var.Names, y=0, yend=`%IncMSE`), color="skyblue") +
+  geom_point(aes(size = IncNodePurity), color="blue", alpha=0.6) +
+  theme_light() +
+  coord_flip() +
+  theme(
+    legend.position="bottom",
+    panel.grid.major.y = element_blank(),
+    panel.border = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+```
+
+
+
+
+
+
+
+
+
+
+Neural Networks
+Source: https://www.datacamp.com/tutorial/neural-network-models-r
+Source: https://www.geeksforgeeks.org/how-neural-networks-are-used-for-regression-in-r-programming/?ref=rp
+
+```{r}
+library(neuralnet)
+library(MASS)
+
+dewlappermin <- g$dewlappermin
+visibility <- g$visibility
+diameter <- g$diameter
+height <- g$height
+svl <- g$svl
+
+data <- data.frame(dewlappermin, visibility, diameter, height, dewsizemax, svl)
+```
+
+```{r}
+# Normalize the data
+maxs <- apply(data, 2, max)
+mins <- apply(data, 2, min)
+scaled <- as.data.frame(scale(data, center = mins, scale = maxs - mins))
+
+# Split the data into training and testing set
+index <- sample(1:nrow(data), round(0.75 * nrow(data)))
+train_ <- scaled[index,]
+test_ <- scaled[-index,]
+
+```
+
+```{r}
+# Build Neural Network
+nn <- neuralnet(dewlappermin ~ visibility + diameter + height + svl,
+				data = train_, hidden = 2,
+				linear.output = FALSE)
+
+# Predict on test data
+pr.nn <- compute(nn, test_[,1:4])
+
+# Compute mean squared error
+pr.nn_ <- pr.nn$net.result * (max(data$dewlappermin) - min(data$dewlappermin))
+											+ min(data$dewlappermin)
+test.r <- (test_$dewlappermin) * (max(data$dewlappermin) - min(data$dewlappermin)) +
+											min(data$dewlappermin)
+MSE.nn <- sum((test.r - pr.nn_)^2) / nrow(test_)
+
+# Plot the neural network
+plot(nn)
+
+```
+
+```{r}
+# Plot regression line
+plot(test_$dewlappermin, pr.nn_, col = "red",
+	main = 'Real vs Predicted')
+abline(0, 1, lwd = 2)
+
+```
+
+Running ANN on small datasets!!!!!!!!!!!!!!!!
+Source: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4454870/
+
+
+```{r}
+nn <- neuralnet(dewlappermin ~ visibility + diameter + height + svl, data = g,  linear.output = FALSE)
+
+plot(nn)
+```
+
+
+
+At SICB I learned about structural equation modeling...
+Here are some resources that may or may not be related...want to inlcude links...
+Miles paper: https://besjournals.onlinelibrary.wiley.com/doi/pdfdirect/10.1111/1365-2656.13773
+Miles paper zenodo: https://zenodo.org/record/6683661#.Y8MXgnbML30
+Jenny Ouyang paper: https://besjournals.onlinelibrary.wiley.com/doi/pdfdirect/10.1111/1365-2656.13773 Zenodo just has code :( (paper isn't open access so it's also downloaded on my computer)
+Introduction to SEM: https://stats.oarc.ucla.edu/r/seminars/rsem/

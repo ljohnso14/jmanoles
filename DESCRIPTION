@@ -1,0 +1,11 @@
+Package: jmanoles
+Type: Package
+Title: Analyzing dewlap display data in relation to dewlap size and habitat visibility
+Version: 0.1.0
+Author: Lauren E Johnson
+Maintainer: Lauren E Johnson <lauren@planetjohnson.com>
+Description: Data from MJ's PhD work back in 2005 
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true
+Import: 
