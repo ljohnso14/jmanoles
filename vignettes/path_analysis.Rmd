@@ -32,11 +32,13 @@ dewlappermin ~ visibility + diameter + height +  svl
 ```{r}
 #fit the model
 fit <-cfa(model, data = g)
+fit2 <-sem(model, data =g)
 ```
 
 ```{r}
 #view the results
 summary(fit, fit.measures = TRUE, standardized=T,rsquare=T)
+summary(fit2, fit.measures = TRUE, standardized=T, rsquare=T)
 ```
 
 ```{r}
@@ -236,3 +238,42 @@ Miles paper: https://besjournals.onlinelibrary.wiley.com/doi/pdfdirect/10.1111/1
 Miles paper zenodo: https://zenodo.org/record/6683661#.Y8MXgnbML30
 Jenny Ouyang paper: https://besjournals.onlinelibrary.wiley.com/doi/pdfdirect/10.1111/1365-2656.13773 Zenodo just has code :( (paper isn't open access so it's also downloaded on my computer)
 Introduction to SEM: https://stats.oarc.ucla.edu/r/seminars/rsem/
+
+
+
+```{r}
+library(lavaan)
+library(semPlot)
+
+model <- '
+      behavior =~ logdewlappermin 
+      habitat =~ height + visibility + diameter
+
+      behavior ~ habitat + svl
+      habitat ~ svl
+'
+fit <- sem(model, data = g)
+summary(fit, standardized = T)
+
+
+semPaths(fit, 'std', layout = 'tree', nCharNodes=0)
+```
+
+
+
+
+
+```{r}
+library(lavaan)
+library(semPlot)
+
+model <- '
+    logdewlappermin ~ 1 + svl + visibility
+    svl~~visibility
+    '
+fit <- sem(model, data = g)
+summary(fit, standardized = T, fit.measures = TRUE, rsquare=T)
+
+
+semPaths(fit, 'std', layout = 'tree', nCharNodes=0)
+```
