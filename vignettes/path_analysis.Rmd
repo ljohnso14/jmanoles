@@ -277,3 +277,8 @@ summary(fit, standardized = T, fit.measures = TRUE, rsquare=T)
 
 semPaths(fit, 'std', layout = 'tree', nCharNodes=0)
 ```
+
+
+
+
+Consider lumping all species together???????????? also considering just doing a multivariate analysis from UCLA website and having it just include the covariation between the two predictors....urgggg!
